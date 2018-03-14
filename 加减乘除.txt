@@ -1,0 +1,412 @@
+; 20H-22H,53H-5DH is used
+; oprand1 at 20H, oprand2 at 22H, opcode at 21H
+; answer
+; digit3 at 56H, digit2 at 57H, digit1 at 58H, digit0 at 59H
+; division has its fraction part at 5AH, 5BH, 5CH, 5DH
+; sign flag 0000000SH at 55H
+
+ORG             0000H
+LJMP            CALC
+
+ORG             1000H
+;branch according to the opcode at 21H
+CALC:             MOV		A,21H
+                        CLR             C
+                        SUBB	        A,#0AH
+			JZ		ADD_CALL	;0AH
+			DEC		A
+			JZ		SUB_CALL	;0BH
+			DEC		A
+			JZ		MUL_CALL	;0CH
+			DEC		A
+			JZ		DIV_CALL	;0DH
+
+ADD_CALL:	LCALL	ADD_SBRT
+
+			LJMP	DONE
+SUB_CALL:	LCALL	SUB_SBRT
+			LJMP	DONE
+MUL_CALL:	LCALL	MUL_SBRT
+			LJMP	DONE
+DIV_CALL:	LCALL	DIV_SBRT
+			LJMP	DONE
+
+			;oprend1 at 20H signal extension at 23H
+ADD_SBRT:	MOV		A,20H
+			ANL		A,#80H	;get the MSB
+			RL		A		;shift the MSB to LSB
+			MOV		53H,A
+			CLR		A
+			SUBB	A,53H
+			MOV		53H,A
+
+			;oprend2 at 22H signal extension at 24H
+			MOV		A,22H
+			ANL		A,7FH	;get the MSB
+			RL		A		;shift the MSB to LSB
+			MOV		54H,A
+			CLR		A
+			SUBB	A,54H
+			MOV		54H,A
+
+			;ADD operation, H at 25H, L at 26H
+			CLR		C
+			MOV		A,20H
+			ADDC	A,22H
+			MOV		56H,A
+			MOV		A,53H
+			ADDC	A,54H
+			MOV		55H,A	;store high bit
+
+			;get sign,27H=0000000S 28H=SSSSSSSS
+			ANL		A,7FH
+			RL		A
+			MOV		57H,A
+			MOV		59H,A
+			CLR		A
+			SUBB	A,59H
+			MOV		58H,A
+
+			;get absolute value of H at 25H and L at 26H, answer H at 23H, L at 24H
+			;inverting
+			MOV		A,55H
+			XRL		A,58H	;invert
+			MOV		55H,A
+			MOV		A,56H
+			XRL		A,58H   ;invert
+			;MOV	26H,A
+			;increasing
+			CLR		C
+			;MOV	A,26H
+			ADDC	A,57H	;add 1
+			MOV		54H,A
+			MOV		A,55H
+			ADDC	A,#00H
+			MOV		53H,A
+
+			; put sign at 25H
+			MOV		55H,57H
+
+			;end of subroutine
+			RET
+
+			;oprend1 signal extension
+SUB_SBRT:	MOV		A,20H
+			ANL		A,#80H
+			RL		A
+			MOV		53H,A
+			CLR		A
+			SUBB	A,53H
+			MOV		53H,A
+
+			;oprend2 signal extension
+			MOV		A,22H
+			ANL		A,#80H
+			RL		A
+			MOV		54H,A
+			CLR		A
+			SUBB	A,54H
+			MOV		54H,A
+
+			;SUB operation, H at 25H, L at 26H
+			CLR		C
+			MOV		A,20H
+			SUBB	A,22H
+			MOV		56H,A
+			MOV		A,53H
+			SUBB	A,54H
+			MOV		55H,A	;store high bit
+
+			;get sign, 27H=0000000S 28H=SSSSSSSS
+			;27H=0000000S
+			;MOV		A,25H
+			ANL		A,#80H
+			RL		A
+			MOV		57H,A
+			;28H=SSSSSSSS
+			MOV		59H,A
+			CLR		A
+			CLR		C
+			SUBB	A,59H
+			MOV		58H,A
+
+			;get absolute value of H at 25H and L at 26H
+			;answer H at 23H, L at 24H
+			;inverting
+			MOV		A,55H
+			XRL		A,58H	;invert
+			MOV		55H,A
+			MOV		A,56H
+			XRL		A,58H   ;invert
+			;MOV	26H,A
+			;increasing
+			CLR		C
+			;MOV	A,26H
+			ADDC	A,57H	;add 1
+			MOV		54H,A
+			MOV		A,55H
+			ADDC	A,#00H
+			MOV		53H,A
+
+			;put sign at 25H
+			MOV		55H,57H
+
+			;end of subroutine
+			RET
+
+			;get sign of answer, 27H=0000000S, 28H=SSSSSSSS
+MUL_SBRT:	MOV		A,20H
+			ANL		A,#80H
+			RL		A
+			MOV		53H,A
+			MOV		A,22H
+			ANL		A,#80H
+			RL		A
+			XRL		A,53H	;get the sign
+			MOV		57H,A	;27H=0000000S
+			MOV		59H,A
+			CLR		A
+			SUBB	A,59H
+			MOV		58H,A	;28H=SSSSSSSS
+
+
+
+			;MUL operation, H at 25H, L at 26H
+			MOV 	A,20H;
+			MOV 	B,22H;
+			MUL		AB;
+			MOV		55H,B
+			MOV		56H,A
+
+			;get absolute value of H at 25H and L at 26H
+			;answer H at 23H, L at 24H
+			;inverting
+			MOV		A,55H
+			XRL		A,58H	;invert
+			MOV		55H,A
+			MOV		A,56H
+			XRL		A,58H   ;invert
+			;MOV	26H,A
+			;increasing
+			CLR		C
+			;MOV	A,26H
+			ADDC	A,57H	;add 1
+			MOV		54H,A
+			MOV		A,55H
+			ADDC	A,#00H
+			MOV		53H,A
+
+			;put sign at 25H
+			MOV		55H,57H
+
+			;end of subroutine
+			RET
+
+			;get sign of answer, 27H=0000000S, 28H=SSSSSSSS
+DIV_SBRT:	MOV		A,20H
+			ANL		A,#80H
+			RL		A
+			MOV		53H,A
+			MOV		A,22H
+			ANL		A,#80H
+			RL		A
+			XRL		A,53H	;get the sign
+			MOV		57H,A	;27H=0000000S
+			MOV		59H,A
+			CLR		A
+			SUBB	A,59H
+			MOV		58H,A	;28H=SSSSSSSS
+
+			;get absolute value of oprend1 at 25H and oprend2 at 26H
+			;answer: oprend1 at 25H, oprend2 at 26H
+			;25H is 0
+			;op1
+			MOV		A,20H
+			MOV		C,ACC.7
+			JNC		OP1_POS
+OP1_NEG:	XRL		A,58H	;invert
+			ADD		A,57H	;increase
+OP1_POS:	MOV		55H,A
+			;op2
+			MOV		A,22H
+			MOV		C,ACC.7
+			JNC		OP2_POS
+OP2_NEG:	XRL		A,58H	;invert
+			ADD		A,57H	;increase
+OP2_POS:	MOV		56H,A
+
+
+
+
+			;DIV operation, Q at 25H, R is for fraction
+			MOV 	A,55H;
+			MOV 	B,56H;
+			DIV		AB;
+			MOV		54H,A;
+			MOV		58H,B;
+			MOV		53H,#00H;
+
+			;put sign at 25H
+			MOV		55H,57H
+
+			;get fraction
+			MOV		5AH,#00H;
+			MOV		5BH,#00H;
+			MOV		5CH,#00H;
+			MOV		5DH,#00H;
+			;divider at 26H, reminder at 28H
+			MOV		A,B;quotient at A
+		;calculate fraction digit1 at 30H
+			MOV		R3,#09H; multiplied by 10
+FRAC1:		ADD		A,B;
+			CLR		C;
+			SUBB	A,56H;
+			MOV		C,ACC.7;
+			JNC		FRAC1_INC
+FRAC1_NINC:	ADD		A,56H	;recover
+			DEC		5AH;
+FRAC1_INC:	INC		5AH		;franction digit increased
+			DJNZ	R3,FRAC1;
+			MOV		B,A
+		;calculate fraction digit2 at 31H
+			MOV		R3,#09H; multiplied by 10
+FRAC2:		ADD		A,B;
+			CLR		C;
+			SUBB	A,56H;
+			MOV		C,ACC.7;
+			JNC		FRAC2_INC
+FRAC2_NINC:	ADD		A,56H	;recover
+			DEC		5BH;
+FRAC2_INC:	INC		5BH		;franction digit increased
+			DJNZ	R3,FRAC2;
+			MOV		B,A
+		;calculate fraction digit3 at 32H
+			MOV		R3,#09H; multiplied by 10
+FRAC3:		ADD		A,B;
+			CLR		C;
+			SUBB	A,56H;
+			MOV		C,ACC.7;
+			JNC		FRAC3_INC
+FRAC3_NINC:	ADD		A,56H	;recover
+			DEC		5CH;
+FRAC3_INC:	INC		5CH		;franction digit increased
+			DJNZ	R3,FRAC3;
+			MOV		B,A
+		;calculate fraction digit3 at 32H
+			MOV		R3,#09H; multiplied by 10
+FRAC4:		ADD		A,B;
+			CLR		C;
+			SUBB	A,56H;
+			MOV		C,ACC.7;
+			JNC		FRAC4_INC
+FRAC4_NINC:	ADD		A,56H	;recover
+			DEC		5DH;
+FRAC4_INC:	INC		5DH		;franction digit increased
+			DJNZ	R3,FRAC4;
+
+
+			RET
+
+
+;BIN2BCD
+; H at 23H, L at 24H, sign at 25H
+; digit3 at 26H, digit2 at 27H, digit1 at 28H, digit0 at 29H
+			;clear
+DONE:		MOV		56H,00H;
+			MOV		57H,00H;
+			MOV		58H,00H;
+			MOV		59H,00H;
+
+			;
+				;subtract 1000
+DIGIT3_LOOP:	CLR		C
+				MOV		A,54H
+				SUBB	A,#0E8H	;L of 1000
+				MOV		54H,A
+				MOV		A,53H
+				SUBB	A,#03H	;H of 1000
+				MOV		53H,A
+				;count digit3
+				INC		56H
+				;test if less than zero
+				MOV		C,ACC.7
+				JNC		DIGIT3_LOOP		;jump if subtracting not over
+
+			;recover the last subtraction
+				DEC		56H
+				CLR		C
+				MOV		A,54H
+				ADDC	A,#0E8H	;L of 1000
+				MOV		54H,A
+				MOV		A,53H
+				ADDC	A,#03H	;H of 1000
+				MOV		53H,A
+
+				;subtract 100
+DIGIT2_LOOP:	CLR		C
+				MOV		A,54H
+				SUBB	A,#64H	;L of 100
+				MOV		54H,A
+				MOV		A,53H
+				SUBB	A,#00H	;H of 100
+				MOV		53H,A
+				;count digit3
+				INC		57H
+				;test if less than zero
+				MOV		C,ACC.7
+				JNC		DIGIT2_LOOP		;jump if subtracting not over
+
+			;recover the last subtraction
+				DEC		57H
+				CLR		C
+				MOV		A,54H
+				ADDC	A,#64H	;L of 100
+				MOV		54H,A
+				MOV		A,53H
+				ADDC	A,#00H	;H of 100
+				MOV		53H,A
+
+				;subtract 10
+DIGIT1_LOOP:	CLR		C
+				MOV		A,54H
+				SUBB	A,#0AH	;10
+				MOV		54H,A
+				;count digit3
+				INC		58H
+				;test if less than zero
+				MOV		C,ACC.7
+				JNC		DIGIT1_LOOP		;jump if subtracting not over
+
+			;recover the last subtraction
+				DEC		58H
+				CLR		C
+				MOV		A,54H
+				ADDC	A,#0AH	;10
+				MOV		54H,A
+
+				;directly move as the BCD of digit0
+DIGIT0_LOOP:	MOV		59H,54H
+
+PRESENT:MOV A,21H
+      CJNE A,#0DH,TRAN
+           MOV 28H,57H
+           MOV 29H,58H
+           MOV 2AH,59H
+           MOV 2BH,#14
+           MOV 2CH,5AH
+           MOV 2DH,5BH
+           MOV 2EH,5CH
+           MOV 2FH,5DH
+           SJMP  BACK
+       TRAN:MOV 2CH,56H
+            MOV 2DH,57H
+            MOV 2EH,58H
+            MOV 2FH,59H
+
+BACK:
+sjmp $
+
+END
+
+; digit3 at 26H, digit2 at 27H, digit1 at 28H, digit0 at 29H
+; sign 0000000SH at 25H
