@@ -1,0 +1,100 @@
+#include<reg51.h>
+#include<intrins.h>
+char code SST516[3] _at_ 0x003b;
+//sbit ad_cs=P;
+sbit ad_wr=P3^6;
+sbit ad_rd=P3^7;
+unsigned char tmp=0;
+ unsigned char t=0;
+void Init_Timer0(void);
+void Init_Timer1(void);
+void send_char(unsigned char txd);
+void adc_read();
+void  adc_START();
+void Timer_isr(void) ;
+
+
+void Delay2(int x)
+{
+while(x--){
+}
+}
+
+
+
+main()
+{
+      Init_Timer1();                      //调用串口中断初始化
+      Init_Timer0();                      //调用中断
+      while(1);
+}
+
+void Init_Timer0(void)
+{
+      TMOD |= 0x01;	  //使用模式1，16位定时器，使用"|"符号可以在使用多个定时器时不受影响
+      TH0=(65536-2000)/256;		  //定时2ms
+      TL0=(65536-2000)%256;
+                       //禁止任何中断
+      EA=1;            //总中断打开
+      ET0=1;           //定时器中断打开
+      TR0=1;           //定时器开关打开
+      PT0=1;           //优先级打开
+}
+/*------------------2---------------------*/
+
+void Init_Timer1(void)
+{
+      TMOD |= 0x20;
+      TH1=0xF3;                      //波特率2400
+      TL1=0xF3;
+      SCON=0x50;                     //设定串行口通讯方式
+      PCON &=0xef;
+      EA=1;                                                            //波特率不倍增
+      TR1=1;
+
+}
+/*------------------中断服务程序------------------*/
+void Timer_isr(void)    interrupt 1
+{
+   TH0=(65536-2000)/256;		  //重装载定时2ms
+   TL0=(65536-2000)%256;
+   adc_START();
+   adc_read ();
+
+
+}
+/*------------------------------------------------*/
+
+void  adc_START()                //启动AD转换写入
+{
+    ad_wr=0;
+    ;
+    ad_wr=1;
+}
+
+void adc_read()                   //定义读取
+{
+   P2=0xff;
+   ;
+   ;
+   ad_rd=0;
+   ;
+   ;
+   t=tmp;
+   tmp=P2;
+
+   if(t!=tmp){
+   send_char(tmp);
+  }             //发送数据
+   ;
+   ad_rd=1;
+
+
+ }
+void send_char(unsigned char txd)
+//传送一个字符
+{
+       SBUF=txd;
+       while(!TI);
+       TI=0;
+}
